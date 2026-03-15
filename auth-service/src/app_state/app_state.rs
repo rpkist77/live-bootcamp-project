@@ -8,11 +8,13 @@ pub type UserStoreType = Arc<RwLock<HashmapUserStore>>;
 
 #[derive(Clone)]
 pub struct AppState<T: UserStore> {
-    pub user_store: T,
+    pub user_store: Arc<RwLock<T>>,
 }
 
 impl<T: UserStore> AppState<T> {
     pub fn new(user_store: T) -> Self {
-        Self { user_store }
+        Self {
+            user_store: Arc::new(RwLock::new(user_store)),
+        }
     }
 }
