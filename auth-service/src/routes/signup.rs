@@ -17,7 +17,7 @@ pub async fn signup<T: UserStore>(
 
     let mut user_store = state.user_store.write().await;
 
-    let does_user_already_exist = user_store.get_user(user.email.clone()).await;
+    let does_user_already_exist = user_store.get_user(&user.email).await;
     match does_user_already_exist {
         Ok(_) => return Err(AuthAPIError::UserAlreadyExists),
         Err(UserStoreError::UserNotFound) => (),

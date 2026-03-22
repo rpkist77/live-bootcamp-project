@@ -1,12 +1,13 @@
 use crate::helpers::{get_random_email, TestApp};
 use auth_service::{
-    app_state::{AppState, UserStoreType},
+    app_state::{AppState, BannedTokenStoreType},
     routes::{signup, SignupRequest, SignupResponse},
-    services::HashmapUserStore,
+    services::{HashmapUserStore, HashsetBannedTokenStore},
     ErrorResponse,
 };
-use axum::{body::to_bytes, extract::State, http::response, response::IntoResponse, Json};
-use reqwest::StatusCode;
+use axum::{body::to_bytes, extract::State, response::IntoResponse, Json};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
@@ -58,7 +59,9 @@ async fn should_return_201_if_valid_input() {
         requires_2fa: true,
     };
 
-    let state = AppState::new(HashmapUserStore::default());
+    let banned_token_store: BannedTokenStoreType =
+        Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
+    let state = AppState::new(HashmapUserStore::default(), banned_token_store);
 
     let response = signup(State(state), Json(signup_request))
         .await
