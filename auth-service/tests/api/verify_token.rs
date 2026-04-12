@@ -4,7 +4,7 @@ use crate::helpers::{get_random_email, TestApp};
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let test_cases = [serde_json::json!({}), serde_json::json!({ "token": 123 })];
 
@@ -17,11 +17,13 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_200_valid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email();
 
@@ -51,11 +53,13 @@ async fn should_return_200_valid_token() {
         .post_verify_token(&serde_json::json!({ "token": token }))
         .await;
     assert_eq!(response.status().as_u16(), 200);
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let response = app
         .post_verify_token(&serde_json::json!({ "token": "invalid_token" }))
@@ -71,11 +75,13 @@ async fn should_return_401_if_invalid_token() {
             .error,
         "Invalid token".to_owned()
     );
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_banned_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email();
 
@@ -109,4 +115,6 @@ async fn should_return_401_if_banned_token() {
         .post_verify_token(&serde_json::json!({ "token": token }))
         .await;
     assert_eq!(response.status().as_u16(), 401);
+
+    app.clean_up().await;
 }

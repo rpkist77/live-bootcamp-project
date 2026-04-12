@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email(); // Call helper method to generate email
 
@@ -50,6 +50,8 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
@@ -125,7 +127,7 @@ async fn should_return_400_if_invalid_input() {
         short_password_request,
     ];
 
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     for i in invalid_inputs.iter() {
         let response = app.post_signup(i).await;
@@ -140,11 +142,13 @@ async fn should_return_400_if_invalid_input() {
             "Invalid credentials".to_owned()
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_409_if_email_already_exists() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     // Call the signup route twice. The second request should fail with a 409 HTTP status code
     let signup_request = SignupRequest {
@@ -173,4 +177,6 @@ async fn should_return_409_if_email_already_exists() {
             .error,
         "User already exists".to_owned()
     );
+
+    app.clean_up().await;
 }
