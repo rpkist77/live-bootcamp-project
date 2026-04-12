@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, LoginAttemptId, Password, TwoFACode, UserStore},
+    domain::{AuthAPIError, Email, LoginAttemptId, TwoFACode, UserStore},
     ErrorResponse,
 };
 
@@ -36,25 +36,22 @@ pub async fn login<T: UserStore>(
             );
         }
     };
-    let password = match Password::parse(request.password) {
-        Ok(password) => password,
-        Err(e) => {
-            eprintln!("Invalid password format: {:?}", e);
-            return (
-                jar,
-                Ok((
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse {
-                        error: "Invalid credentials".to_string(),
-                    }),
-                )
-                    .into_response()),
-            );
-        }
-    };
+    let raw_password = request.password;
+    if raw_password.len() < 8 {
+        return (
+            jar,
+            Ok((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "Invalid credentials".to_string(),
+                }),
+            )
+                .into_response()),
+        );
+    }
 
     let user_store = state.user_store.read().await;
-    if let Err(error) = user_store.validate_user(&email, password).await {
+    if let Err(error) = user_store.validate_user(&email, &raw_password).await {
         eprintln!("Login failed: {:?}", error);
         return (
             jar,

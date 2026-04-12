@@ -23,16 +23,17 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         self.codes.insert(email, (login_attempt_id, code));
         Ok(())
     }
+
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
         self.codes.remove(email);
         Ok(())
     }
+
     async fn get_code(
         &self,
         email: &Email,
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError> {
-        let result = self.codes.get(email);
-        match result {
+        match self.codes.get(email) {
             None => Err(TwoFACodeStoreError::LoginAttemptIdNotFound),
             Some(pair) => Ok(pair.clone()),
         }

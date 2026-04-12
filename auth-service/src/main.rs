@@ -2,8 +2,8 @@ use auth_service::{
     app_state::{AppState, BannedTokenStoreType},
     get_postgres_pool,
     services::{
-        hashmap_two_fa_code_store::HashmapTwoFACodeStore, mock_email_client::MockEmailClient,
-        HashmapUserStore, HashsetBannedTokenStore,
+        data_stores::{HashmapTwoFACodeStore, HashsetBannedTokenStore, PostgresUserStore},
+        mock_email_client::MockEmailClient,
     },
     utils::constants::{prod, DATABASE_URL},
     Application,
@@ -14,9 +14,8 @@ use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() {
-    let _pg_pool = configure_postgresql().await;
-
-    let user_store = HashmapUserStore::default();
+    let pg_pool = configure_postgresql().await;
+    let user_store = PostgresUserStore::new(pg_pool);
     let banned_token_store: BannedTokenStoreType =
         Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
     let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));

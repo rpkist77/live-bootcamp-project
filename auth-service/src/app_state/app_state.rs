@@ -1,5 +1,5 @@
-use crate::domain::{email_client, BannedTokenStore, EmailClient, TwoFACodeStore, UserStore};
-use crate::services::hashmap_user_store::HashmapUserStore;
+use crate::domain::{BannedTokenStore, EmailClient, TwoFACodeStore, UserStore};
+use crate::services::HashmapUserStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

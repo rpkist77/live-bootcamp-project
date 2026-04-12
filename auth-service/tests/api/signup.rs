@@ -1,13 +1,9 @@
 use crate::helpers::{get_random_email, TestApp};
-use auth_service::routes::TwoFactorAuthResponse;
-use auth_service::services::mock_email_client::{self, MockEmailClient};
+use auth_service::services::mock_email_client::MockEmailClient;
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType},
-    domain::TwoFACodeStore,
     routes::{signup, SignupRequest, SignupResponse},
-    services::{
-        hashmap_two_fa_code_store::HashmapTwoFACodeStore, HashmapUserStore, HashsetBannedTokenStore,
-    },
+    services::data_stores::{HashmapTwoFACodeStore, HashmapUserStore, HashsetBannedTokenStore},
     ErrorResponse,
 };
 use axum::{body::to_bytes, extract::State, response::IntoResponse, Json};
