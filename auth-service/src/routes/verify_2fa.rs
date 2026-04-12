@@ -39,11 +39,11 @@ pub async fn verify_2fa<T: UserStore>(
 
     let mut two_fa_code_store = state.two_fa_code_store.write().await;
 
-    let (stored_login_attempt_id, stored_two_fa_code) = match two_fa_code_store.get_code(&email).await
-    {
-        Ok(code_tuple) => code_tuple,
-        Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
-    };
+    let (stored_login_attempt_id, stored_two_fa_code) =
+        match two_fa_code_store.get_code(&email).await {
+            Ok(code_tuple) => code_tuple,
+            Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
+        };
 
     if stored_login_attempt_id != login_attempt_id || stored_two_fa_code != two_fa_code {
         return (jar, Err(AuthAPIError::IncorrectCredentials));

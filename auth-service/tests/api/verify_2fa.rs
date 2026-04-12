@@ -1,9 +1,5 @@
-
 use auth_service::{
-    domain::Email,
-    routes::TwoFactorAuthResponse,
-    utils::constants::JWT_COOKIE_NAME,
-    ErrorResponse,
+    domain::Email, routes::TwoFactorAuthResponse, utils::constants::JWT_COOKIE_NAME, ErrorResponse,
 };
 
 use crate::helpers::{get_random_email, TestApp};
@@ -65,7 +61,12 @@ async fn should_return_400_if_invalid_input() {
 
     for input in invalid_inputs.iter() {
         let response = app.post_verify_2fa(input).await;
-        assert_eq!(response.status().as_u16(), 400, "Failed for input: {:?}", input);
+        assert_eq!(
+            response.status().as_u16(),
+            400,
+            "Failed for input: {:?}",
+            input
+        );
 
         assert_eq!(
             response
