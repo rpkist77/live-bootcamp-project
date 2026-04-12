@@ -1,5 +1,7 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
-use serde::{Deserialize, Serialize};
+use secrecy::ExposeSecret;
+use secrecy::SecretString;
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
@@ -51,10 +53,23 @@ impl SignupResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SignupRequest {
-    pub email: String,
-    pub password: String,
+    pub email: SecretString,
+    pub password: SecretString,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
+}
+
+impl Serialize for SignupRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("SignupRequest", 3)?;
+        state.serialize_field("email", self.email.expose_secret())?;
+        state.serialize_field("password", self.password.expose_secret())?;
+        state.serialize_field("requires2FA", &self.requires_2fa)?;
+        state.end()
+    }
 }

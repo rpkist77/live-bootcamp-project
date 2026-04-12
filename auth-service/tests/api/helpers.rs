@@ -13,6 +13,7 @@ use auth_service::{
 };
 use redis::Connection as RedisConnection;
 use reqwest::cookie::Jar;
+use secrecy::ExposeSecret;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     Connection, Executor, PgConnection, PgPool,
@@ -152,7 +153,7 @@ pub fn get_random_email() -> String {
 }
 
 async fn configure_postgresql() -> (PgPool, String) {
-    let postgresql_conn_url = DATABASE_URL.to_owned();
+    let postgresql_conn_url = DATABASE_URL.expose_secret().to_owned();
     let db_name = Uuid::new_v4().to_string();
 
     configure_database(&postgresql_conn_url, &db_name).await;
@@ -191,7 +192,7 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
 }
 
 async fn delete_database(db_name: &str) {
-    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+    let postgresql_conn_url: String = DATABASE_URL.expose_secret().to_owned();
 
     let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
         .expect("Failed to parse PostgreSQL connection string");

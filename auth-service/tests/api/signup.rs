@@ -7,6 +7,7 @@ use auth_service::{
     ErrorResponse,
 };
 use axum::{body::to_bytes, extract::State, response::IntoResponse, Json};
+use secrecy::SecretString;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -57,8 +58,8 @@ async fn should_return_422_if_malformed_input() {
 #[tokio::test]
 async fn should_return_201_if_valid_input() {
     let signup_request = SignupRequest {
-        email: "test@test.com".to_string(),
-        password: "password123".to_string(),
+        email: SecretString::from("test@test.com".to_string()),
+        password: SecretString::from("password123".to_string()),
         requires_2fa: false,
     };
 
@@ -104,20 +105,20 @@ async fn should_return_400_if_invalid_input() {
     // Create an array of invalid inputs. Then, iterate through the array and
     // make HTTP calls to the signup route. Assert a 400 HTTP status code is returned.
     let no_at_symbol_request = SignupRequest {
-        email: "testtest.com".to_string(),
-        password: "password123".to_string(),
+        email: SecretString::from("testtest.com".to_string()),
+        password: SecretString::from("password123".to_string()),
         requires_2fa: true,
     };
 
     let empty_email_request = SignupRequest {
-        email: "".to_string(),
-        password: "password123".to_string(),
+        email: SecretString::from("".to_string()),
+        password: SecretString::from("password123".to_string()),
         requires_2fa: true,
     };
 
     let short_password_request = SignupRequest {
-        email: "test@test.com".to_string(),
-        password: "short".to_string(),
+        email: SecretString::from("test@test.com".to_string()),
+        password: SecretString::from("short".to_string()),
         requires_2fa: true,
     };
 
@@ -152,8 +153,8 @@ async fn should_return_409_if_email_already_exists() {
 
     // Call the signup route twice. The second request should fail with a 409 HTTP status code
     let signup_request = SignupRequest {
-        email: "test@test.com".to_string(),
-        password: "password123".to_string(),
+        email: SecretString::from("test@test.com".to_string()),
+        password: SecretString::from("password123".to_string()),
         requires_2fa: true,
     };
 
@@ -161,8 +162,8 @@ async fn should_return_409_if_email_already_exists() {
     assert_eq!(response.status().as_u16(), 201);
 
     let signup_request = SignupRequest {
-        email: "test@test.com".to_string(),
-        password: "password123".to_string(),
+        email: SecretString::from("test@test.com".to_string()),
+        password: SecretString::from("password123".to_string()),
         requires_2fa: true,
     };
 

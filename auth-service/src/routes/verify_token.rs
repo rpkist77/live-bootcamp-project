@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use secrecy::SecretString;
 use serde::Deserialize;
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct VerifyTokenRequest {
-    pub token: String,
+    pub token: SecretString,
 }
 
 #[tracing::instrument(name = "Verify token", skip_all)]

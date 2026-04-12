@@ -1,5 +1,6 @@
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use reqwest::Url;
+use secrecy::SecretString;
 
 use crate::helpers::TestApp;
 
@@ -75,7 +76,7 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .banned_token_store
         .read()
         .await
-        .contains_token(&token)
+        .contains_token(&SecretString::from(token))
         .await
         .unwrap();
     assert!(

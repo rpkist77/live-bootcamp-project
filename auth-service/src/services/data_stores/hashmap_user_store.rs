@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::domain::{Email, User, UserStore, UserStoreError};
+use secrecy::SecretString;
 
 #[derive(Default, Clone)]
 pub struct HashmapUserStore {
@@ -24,7 +25,11 @@ impl UserStore for HashmapUserStore {
         }
     }
 
-    async fn validate_user(&self, email: &Email, raw_password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(
+        &self,
+        email: &Email,
+        raw_password: &SecretString,
+    ) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
         user.password
@@ -38,13 +43,14 @@ impl UserStore for HashmapUserStore {
 mod tests {
     use super::*;
     use crate::domain::HashedPassword;
+    use secrecy::SecretString;
 
     #[tokio::test]
     async fn test_add_user() {
         let mut user_store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com".to_string()).unwrap(),
-            HashedPassword::parse("password123".to_string())
+            Email::parse(SecretString::from("test@example.com".to_string())).unwrap(),
+            HashedPassword::parse(SecretString::from("password123".to_string()))
                 .await
                 .unwrap(),
             false,
@@ -60,8 +66,8 @@ mod tests {
     async fn test_get_user() {
         let mut user_store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com".to_string()).unwrap(),
-            HashedPassword::parse("password123".to_string())
+            Email::parse(SecretString::from("test@example.com".to_string())).unwrap(),
+            HashedPassword::parse(SecretString::from("password123".to_string()))
                 .await
                 .unwrap(),
             false,
@@ -70,7 +76,9 @@ mod tests {
 
         assert_eq!(
             user_store
-                .get_user(&Email::parse("test@example.com".to_string()).unwrap())
+                .get_user(
+                    &Email::parse(SecretString::from("test@example.com".to_string())).unwrap()
+                )
                 .await
                 .unwrap(),
             user
@@ -78,7 +86,10 @@ mod tests {
 
         assert_eq!(
             user_store
-                .get_user(&Email::parse("nonexistent@example.com".to_string()).unwrap())
+                .get_user(
+                    &Email::parse(SecretString::from("nonexistent@example.com".to_string()))
+                        .unwrap()
+                )
                 .await
                 .unwrap_err(),
             UserStoreError::UserNotFound
@@ -89,8 +100,8 @@ mod tests {
     async fn test_validate_user() {
         let mut user_store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com".to_string()).unwrap(),
-            HashedPassword::parse("password123".to_string())
+            Email::parse(SecretString::from("test@example.com".to_string())).unwrap(),
+            HashedPassword::parse(SecretString::from("password123".to_string()))
                 .await
                 .unwrap(),
             false,
@@ -99,8 +110,8 @@ mod tests {
 
         assert!(user_store
             .validate_user(
-                &Email::parse("test@example.com".to_string()).unwrap(),
-                "password123",
+                &Email::parse(SecretString::from("test@example.com".to_string())).unwrap(),
+                &SecretString::from("password123".to_string()),
             )
             .await
             .is_ok());
@@ -108,8 +119,8 @@ mod tests {
         assert_eq!(
             user_store
                 .validate_user(
-                    &Email::parse("test@example.com".to_string()).unwrap(),
-                    "wrongpassword",
+                    &Email::parse(SecretString::from("test@example.com".to_string())).unwrap(),
+                    &SecretString::from("wrongpassword".to_string()),
                 )
                 .await
                 .unwrap_err(),
@@ -119,8 +130,9 @@ mod tests {
         assert_eq!(
             user_store
                 .validate_user(
-                    &Email::parse("nonexistent@example.com".to_string()).unwrap(),
-                    "password123",
+                    &Email::parse(SecretString::from("nonexistent@example.com".to_string()))
+                        .unwrap(),
+                    &SecretString::from("password123".to_string()),
                 )
                 .await
                 .unwrap_err(),

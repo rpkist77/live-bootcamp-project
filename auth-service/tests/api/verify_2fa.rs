@@ -1,6 +1,7 @@
 use auth_service::{
     domain::Email, routes::TwoFactorAuthResponse, utils::constants::JWT_COOKIE_NAME, ErrorResponse,
 };
+use secrecy::{ExposeSecret, SecretString};
 
 use crate::helpers::{get_random_email, TestApp};
 
@@ -138,7 +139,10 @@ async fn should_return_401_if_old_code() {
     let first_login = app.post_login(&login_body).await;
     assert_eq!(first_login.status().as_u16(), 206);
 
-    let email = Email::parse(signup_body["email"].as_str().unwrap().to_owned()).unwrap();
+    let email = Email::parse(SecretString::from(
+        signup_body["email"].as_str().unwrap().to_owned(),
+    ))
+    .unwrap();
     let (old_login_attempt_id, old_code) = app
         .two_fa_code_store
         .read()
@@ -152,8 +156,8 @@ async fn should_return_401_if_old_code() {
 
     let verify_body = serde_json::json!({
         "email": signup_body["email"],
-        "loginAttemptId": old_login_attempt_id.as_ref(),
-        "2FACode": old_code.as_ref()
+        "loginAttemptId": old_login_attempt_id.as_ref().expose_secret(),
+        "2FACode": old_code.as_ref().expose_secret()
     });
 
     let response = app.post_verify_2fa(&verify_body).await;
@@ -188,7 +192,10 @@ async fn should_return_200_if_correct_code() {
         .await
         .expect("Could not deserialize login response");
 
-    let email = Email::parse(signup_body["email"].as_str().unwrap().to_owned()).unwrap();
+    let email = Email::parse(SecretString::from(
+        signup_body["email"].as_str().unwrap().to_owned(),
+    ))
+    .unwrap();
     let (_, code) = app
         .two_fa_code_store
         .read()
@@ -200,7 +207,7 @@ async fn should_return_200_if_correct_code() {
     let verify_body = serde_json::json!({
         "email": signup_body["email"],
         "loginAttemptId": response_body.login_attempt_id,
-        "2FACode": code.as_ref()
+        "2FACode": code.as_ref().expose_secret()
     });
 
     let response = app.post_verify_2fa(&verify_body).await;
@@ -240,7 +247,10 @@ async fn should_return_401_if_same_code_twice() {
         .await
         .expect("Could not deserialize login response");
 
-    let email = Email::parse(signup_body["email"].as_str().unwrap().to_owned()).unwrap();
+    let email = Email::parse(SecretString::from(
+        signup_body["email"].as_str().unwrap().to_owned(),
+    ))
+    .unwrap();
     let (_, code) = app
         .two_fa_code_store
         .read()
@@ -252,7 +262,7 @@ async fn should_return_401_if_same_code_twice() {
     let verify_body = serde_json::json!({
         "email": signup_body["email"],
         "loginAttemptId": response_body.login_attempt_id,
-        "2FACode": code.as_ref()
+        "2FACode": code.as_ref().expose_secret()
     });
 
     let first_response = app.post_verify_2fa(&verify_body).await;

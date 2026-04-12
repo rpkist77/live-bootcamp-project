@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use secrecy::{ExposeSecret, SecretString};
 
 use crate::domain::{
     data_stores::{UserStore, UserStoreError},
@@ -25,8 +26,8 @@ impl UserStore for PostgresUserStore {
             INSERT INTO users (email, password_hash, requires_2fa)
             VALUES ($1, $2, $3)
             "#,
-            user.email.as_ref(),
-            user.password.as_ref(),
+            user.email.as_ref().expose_secret(),
+            user.password.as_ref().expose_secret(),
             user.requires_2fa,
         )
         .execute(&self.pool)
@@ -51,22 +52,27 @@ impl UserStore for PostgresUserStore {
             FROM users
             WHERE email = $1
             "#,
-            email.as_ref(),
+            email.as_ref().expose_secret(),
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| UserStoreError::UnexpectedError(e.into()))?
         .ok_or(UserStoreError::UserNotFound)?;
 
-        let email = Email::parse(row.email).map_err(UserStoreError::UnexpectedError)?;
-        let password = HashedPassword::parse_password_hash(row.password_hash)
+        let email = Email::parse(SecretString::from(row.email))
+            .map_err(UserStoreError::UnexpectedError)?;
+        let password = HashedPassword::parse_password_hash(SecretString::from(row.password_hash))
             .map_err(UserStoreError::UnexpectedError)?;
 
         Ok(User::new(email, password, row.requires_2fa))
     }
 
     #[tracing::instrument(name = "Validating user credentials in PostgreSQL", skip_all)]
-    async fn validate_user(&self, email: &Email, raw_password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(
+        &self,
+        email: &Email,
+        raw_password: &SecretString,
+    ) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
         user.password

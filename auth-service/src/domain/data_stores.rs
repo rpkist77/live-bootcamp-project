@@ -1,5 +1,6 @@
 use crate::domain::Email;
 use color_eyre::eyre::{eyre, Context, Report, Result};
+use secrecy::{ExposeSecret, SecretString};
 use thiserror::Error;
 
 use super::User;
@@ -8,7 +9,11 @@ use super::User;
 pub trait UserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
-    async fn validate_user(&self, email: &Email, raw_password: &str) -> Result<(), UserStoreError>;
+    async fn validate_user(
+        &self,
+        email: &Email,
+        raw_password: &SecretString,
+    ) -> Result<(), UserStoreError>;
 }
 
 #[derive(Debug, Error)]
@@ -37,8 +42,11 @@ impl PartialEq for UserStoreError {
 
 #[async_trait::async_trait]
 pub trait BannedTokenStore {
-    async fn add_banned_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn add_banned_token(
+        &mut self,
+        token: SecretString,
+    ) -> Result<(), BannedTokenStoreError>;
+    async fn contains_token(&self, token: &SecretString) -> Result<bool, BannedTokenStoreError>;
 }
 
 #[derive(Debug, Error)]
@@ -81,35 +89,51 @@ impl PartialEq for TwoFACodeStoreError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LoginAttemptId(String);
+#[derive(Debug, Clone)]
+pub struct LoginAttemptId(SecretString);
+
+impl PartialEq for LoginAttemptId {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl LoginAttemptId {
-    pub fn parse(id: String) -> Result<Self> {
-        let parsed_id = uuid::Uuid::parse_str(&id).wrap_err("Invalid login attempt id")?;
-        Ok(Self(parsed_id.to_string()))
+    pub fn parse(id: SecretString) -> Result<Self> {
+        let parsed_id = uuid::Uuid::parse_str(id.expose_secret())
+            .wrap_err("Invalid login attempt id")?;
+        Ok(Self(SecretString::from(parsed_id.to_string())))
     }
 }
 
 impl Default for LoginAttemptId {
     fn default() -> Self {
         // Use the `uuid` crate to generate a random version 4 UUID
-        LoginAttemptId(uuid::Uuid::new_v4().to_string())
+        LoginAttemptId(SecretString::from(uuid::Uuid::new_v4().to_string()))
     }
 }
 
-impl AsRef<str> for LoginAttemptId {
-    fn as_ref(&self) -> &str {
+impl AsRef<SecretString> for LoginAttemptId {
+    fn as_ref(&self) -> &SecretString {
         &self.0
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TwoFACode(String);
+#[derive(Clone, Debug)]
+pub struct TwoFACode(SecretString);
+
+impl PartialEq for TwoFACode {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl TwoFACode {
-    pub fn parse(code: String) -> Result<Self> {
-        let code_as_u32 = code.parse::<u32>().wrap_err("Invalid 2FA code")?;
+    pub fn parse(code: SecretString) -> Result<Self> {
+        let code_as_u32 = code
+            .expose_secret()
+            .parse::<u32>()
+            .wrap_err("Invalid 2FA code")?;
 
         if (100_000..=999_999).contains(&code_as_u32) {
             Ok(Self(code))
@@ -124,12 +148,12 @@ impl Default for TwoFACode {
         // Use the `rand` crate to generate a random 2FA code.
         // The code should be 6 digits (ex: 834629)
         let num: u32 = rand::random_range(100000..=999999);
-        TwoFACode(num.to_string())
+        TwoFACode(SecretString::from(num.to_string()))
     }
 }
 
-impl AsRef<str> for TwoFACode {
-    fn as_ref(&self) -> &str {
+impl AsRef<SecretString> for TwoFACode {
+    fn as_ref(&self) -> &SecretString {
         &self.0
     }
 }

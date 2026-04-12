@@ -3,6 +3,7 @@ use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::Utc;
 use color_eyre::eyre::{eyre, Context, Result};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::BannedTokenStoreType;
@@ -47,7 +48,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
         .try_into()
         .wrap_err(format!("failed to cast exp time to usize. exp time: {}", exp))?;
 
-    let sub = email.as_ref().to_owned();
+    let sub = email.as_ref().expose_secret().to_owned();
 
     let claims = Claims { sub, exp };
 
@@ -57,7 +58,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
 // Check if JWT auth token is valid by decoding it using the JWT secret
 #[tracing::instrument(name = "Validate auth token", skip_all)]
 pub async fn validate_token(
-    token: &str,
+    token: &SecretString,
     banned_token_store: BannedTokenStoreType,
 ) -> Result<Claims> {
     match banned_token_store.read().await.contains_token(token).await {
@@ -70,8 +71,8 @@ pub async fn validate_token(
     }
 
     decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
+        token.expose_secret(),
+        &DecodingKey::from_secret(JWT_SECRET.expose_secret().as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
@@ -84,7 +85,7 @@ fn create_token(claims: &Claims) -> Result<String> {
     encode(
         &jsonwebtoken::Header::default(),
         &claims,
-        &EncodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &EncodingKey::from_secret(JWT_SECRET.expose_secret().as_bytes()),
     )
     .wrap_err("failed to create token")
 }
@@ -110,7 +111,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(SecretString::from("test@example.com".to_owned())).unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
@@ -132,16 +133,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(SecretString::from("test@example.com".to_owned())).unwrap();
         let result = generate_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
     }
 
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(SecretString::from("test@example.com".to_owned())).unwrap();
         let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token, make_banned_store()).await.unwrap();
+        let result = validate_token(&SecretString::from(token), make_banned_store())
+            .await
+            .unwrap();
         assert_eq!(result.sub, "test@example.com");
 
         let exp = Utc::now()
@@ -154,23 +157,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
-        let token = "invalid_token".to_owned();
+        let token = SecretString::from("invalid_token".to_owned());
         let result = validate_token(&token, make_banned_store()).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_validate_token_with_banned_token() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(SecretString::from("test@example.com".to_owned())).unwrap();
         let token = generate_auth_token(&email).unwrap();
         let banned_store = make_banned_store();
         banned_store
             .write()
             .await
-            .add_banned_token(token.clone())
+            .add_banned_token(SecretString::from(token.clone()))
             .await
             .unwrap();
-        let result = validate_token(&token, banned_store).await;
+        let result = validate_token(&SecretString::from(token), banned_store).await;
         assert!(result.is_err());
     }
 }
