@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use auth_service::{
-    app_state::{AppState, BannedTokenStoreType},
-    services::{HashmapUserStore, HashsetBannedTokenStore},
+    app_state::{AppState, BannedTokenStoreType, TwoFACodeStoreType},
+    domain::email_client,
+    services::{
+        hashmap_two_fa_code_store::HashmapTwoFACodeStore, mock_email_client::MockEmailClient,
+        HashmapUserStore, HashsetBannedTokenStore,
+    },
     Application,
 };
 use reqwest::cookie::Jar;
@@ -14,6 +18,7 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
+    pub two_fa_code_store: TwoFACodeStoreType, // New!
 }
 
 impl TestApp {
@@ -21,7 +26,15 @@ impl TestApp {
         let user_store = HashmapUserStore::default();
         let banned_token_store: BannedTokenStoreType =
             Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
-        let app_state = AppState::new(user_store, banned_token_store.clone());
+        let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+        let email_client = Arc::new(RwLock::new(MockEmailClient));
+
+        let app_state = AppState::new(
+            user_store,
+            banned_token_store.clone(),
+            two_fa_code_store.clone(),
+            email_client,
+        );
         let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build app");
@@ -42,6 +55,7 @@ impl TestApp {
             cookie_jar,
             http_client,
             banned_token_store,
+            two_fa_code_store,
         }
     }
 
@@ -85,9 +99,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_verify_2fa(&self) -> reqwest::Response {
+    pub async fn post_verify_2fa<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/verify-2fa", &self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")

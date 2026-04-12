@@ -1,8 +1,13 @@
 use crate::helpers::{get_random_email, TestApp};
+use auth_service::routes::TwoFactorAuthResponse;
+use auth_service::services::mock_email_client::{self, MockEmailClient};
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType},
+    domain::TwoFACodeStore,
     routes::{signup, SignupRequest, SignupResponse},
-    services::{HashmapUserStore, HashsetBannedTokenStore},
+    services::{
+        hashmap_two_fa_code_store::HashmapTwoFACodeStore, HashmapUserStore, HashsetBannedTokenStore,
+    },
     ErrorResponse,
 };
 use axum::{body::to_bytes, extract::State, response::IntoResponse, Json};
@@ -56,12 +61,21 @@ async fn should_return_201_if_valid_input() {
     let signup_request = SignupRequest {
         email: "test@test.com".to_string(),
         password: "password123".to_string(),
-        requires_2fa: true,
+        requires_2fa: false,
     };
 
     let banned_token_store: BannedTokenStoreType =
         Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
-    let state = AppState::new(HashmapUserStore::default(), banned_token_store);
+
+    let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+    let email_client = Arc::new(RwLock::new(MockEmailClient));
+
+    let state = AppState::new(
+        HashmapUserStore::default(),
+        banned_token_store,
+        two_fa_code_store,
+        email_client,
+    );
 
     let response = signup(State(state), Json(signup_request))
         .await

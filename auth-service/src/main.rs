@@ -1,6 +1,10 @@
 use auth_service::{
     app_state::{AppState, BannedTokenStoreType},
-    services::{HashmapUserStore, HashsetBannedTokenStore},
+    domain::email_client,
+    services::{
+        hashmap_two_fa_code_store::HashmapTwoFACodeStore, mock_email_client::MockEmailClient,
+        HashmapUserStore, HashsetBannedTokenStore,
+    },
     utils::constants::prod,
     Application,
 };
@@ -12,7 +16,15 @@ async fn main() {
     let user_store = HashmapUserStore::default();
     let banned_token_store: BannedTokenStoreType =
         Arc::new(RwLock::new(HashsetBannedTokenStore::default()));
-    let app_state = AppState::new(user_store, banned_token_store);
+    let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+    let email_client = Arc::new(RwLock::new(MockEmailClient));
+
+    let app_state = AppState::new(
+        user_store,
+        banned_token_store,
+        two_fa_code_store,
+        email_client,
+    );
 
     let app = Application::build(app_state, prod::APP_ADDRESS)
         .await
