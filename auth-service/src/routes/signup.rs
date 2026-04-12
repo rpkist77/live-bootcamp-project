@@ -6,12 +6,12 @@ use crate::{
     domain::{AuthAPIError, Email, HashedPassword, User, UserStore, UserStoreError},
 };
 
-#[tracing::instrument(name = "Signup", skip_all, err(Debug))]
+#[tracing::instrument(name = "Signup", skip_all)]
 pub async fn signup<T: UserStore>(
     State(state): State<AppState<T>>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(request.email)?;
+    let email = Email::parse(request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password: HashedPassword = HashedPassword::parse(request.password)
         .await
         .map_err(|_| AuthAPIError::InvalidCredentials)?;
@@ -24,15 +24,11 @@ pub async fn signup<T: UserStore>(
     match does_user_already_exist {
         Ok(_) => return Err(AuthAPIError::UserAlreadyExists),
         Err(UserStoreError::UserNotFound) => (),
-        Err(e) => {
-            tracing::error!("Unexpected error when checking if user exists: {:?}", e);
-            return Err(AuthAPIError::UnexpectedError);
-        }
+        Err(e) => return Err(AuthAPIError::UnexpectedError(e.into())),
     }
 
     if let Err(e) = user_store.add_user(user).await {
-        tracing::error!("Unexpected error when adding user: {:?}", e);
-        return Err(AuthAPIError::UnexpectedError);
+        return Err(AuthAPIError::UnexpectedError(e.into()));
     }
 
     let response = Json(SignupResponse {

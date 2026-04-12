@@ -17,6 +17,7 @@ pub struct Verify2FARequest {
     pub two_fa_code: String,
 }
 
+#[tracing::instrument(name = "Verify 2FA", skip_all)]
 pub async fn verify_2fa<T: UserStore>(
     State(state): State<AppState<T>>,
     jar: CookieJar,
@@ -51,12 +52,11 @@ pub async fn verify_2fa<T: UserStore>(
 
     let auth_cookie = match generate_auth_cookie(&email) {
         Ok(cookie) => cookie,
-        Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
+        Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e))),
     };
 
     if let Err(e) = two_fa_code_store.remove_code(&email).await {
-        eprintln!("Failed to remove used 2FA code: {:?}", e);
-        return (jar, Err(AuthAPIError::UnexpectedError));
+        return (jar, Err(AuthAPIError::UnexpectedError(e.into())));
     }
 
     let updated_jar = jar.add(auth_cookie);

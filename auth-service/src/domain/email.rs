@@ -1,12 +1,12 @@
-use crate::domain::AuthAPIError;
+use color_eyre::eyre::{eyre, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Email(String);
 
 impl Email {
-    pub fn parse(email: String) -> Result<Self, AuthAPIError> {
+    pub fn parse(email: String) -> Result<Self> {
         if email.is_empty() || !email.contains('@') {
-            return Err(AuthAPIError::InvalidCredentials);
+            return Err(eyre!("invalid email format"));
         }
         Ok(Self(email))
     }

@@ -2,56 +2,56 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
 };
-use std::error::Error;
+use color_eyre::eyre::{Context, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HashedPassword(String);
 
 impl HashedPassword {
-    pub async fn parse(s: String) -> Result<Self, String> {
+    pub async fn parse(s: String) -> Result<Self> {
         if s.is_empty() || s.len() < 8 {
-            return Err("Password must be at least 8 characters".to_owned());
+            return Err(color_eyre::eyre::eyre!(
+                "Password must be at least 8 characters"
+            ));
         }
 
-        let password_hash = compute_password_hash(&s).await.map_err(|e| e.to_string())?;
+        let password_hash = compute_password_hash(&s).await?;
 
         Ok(Self(password_hash))
     }
 
-    pub fn parse_password_hash(hash: String) -> Result<HashedPassword, String> {
-        PasswordHash::new(&hash).map_err(|e| e.to_string())?;
+    pub fn parse_password_hash(hash: String) -> Result<HashedPassword> {
+        PasswordHash::new(&hash).wrap_err("invalid argon2 hash")?;
         Ok(HashedPassword(hash))
     }
 
-    #[tracing::instrument(name = "Verify raw password", skip_all)]
-    pub async fn verify_raw_password(
-        &self,
-        password_candidate: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    #[tracing::instrument(name = "Verify password hash", skip_all)]
+    pub async fn verify_raw_password(&self, password_candidate: &str) -> Result<()> {
         let current_span: tracing::Span = tracing::Span::current();
         let password_hash = self.as_ref().to_owned();
         let password_candidate = password_candidate.to_owned();
 
-        tokio::task::spawn_blocking(move || {
+        let result = tokio::task::spawn_blocking(move || {
             current_span.in_scope(|| {
                 let expected_password_hash = PasswordHash::new(&password_hash)?;
 
                 Argon2::default()
                     .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-                    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })
+                    .wrap_err("failed to verify password hash")
             })
         })
-        .await
-        .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
+        .await;
+
+        result?
     }
 }
 
 #[tracing::instrument(name = "Computing password hash", skip_all)]
-async fn compute_password_hash(password: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
+async fn compute_password_hash(password: &str) -> Result<String> {
     let current_span: tracing::Span = tracing::Span::current();
     let password = password.to_owned();
 
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
             let salt: SaltString = SaltString::generate(&mut OsRng);
             let password_hash = Argon2::new(
@@ -62,11 +62,12 @@ async fn compute_password_hash(password: &str) -> Result<String, Box<dyn Error +
             .hash_password(password.as_bytes(), &salt)?
             .to_string();
 
-            Ok::<String, Box<dyn Error + Send + Sync>>(password_hash)
+            Ok(password_hash)
         })
     })
-    .await
-    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
+    .await;
+
+    result?
 }
 
 impl AsRef<str> for HashedPassword {

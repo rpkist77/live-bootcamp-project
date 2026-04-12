@@ -12,6 +12,7 @@ pub struct VerifyTokenRequest {
     pub token: String,
 }
 
+#[tracing::instrument(name = "Verify token", skip_all)]
 pub async fn verify_token<T: UserStore>(
     State(state): State<AppState<T>>,
     Json(request): Json<VerifyTokenRequest>,
