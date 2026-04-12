@@ -13,9 +13,7 @@ impl HashedPassword {
             return Err("Password must be at least 8 characters".to_owned());
         }
 
-        let password_hash = compute_password_hash(&s)
-            .await
-            .map_err(|e| e.to_string())?;
+        let password_hash = compute_password_hash(&s).await.map_err(|e| e.to_string())?;
 
         Ok(Self(password_hash))
     }
@@ -25,41 +23,47 @@ impl HashedPassword {
         Ok(HashedPassword(hash))
     }
 
+    #[tracing::instrument(name = "Verify raw password", skip_all)]
     pub async fn verify_raw_password(
         &self,
         password_candidate: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let current_span: tracing::Span = tracing::Span::current();
         let password_hash = self.as_ref().to_owned();
         let password_candidate = password_candidate.to_owned();
 
         tokio::task::spawn_blocking(move || {
-            let expected_password_hash = PasswordHash::new(&password_hash)?;
+            current_span.in_scope(|| {
+                let expected_password_hash = PasswordHash::new(&password_hash)?;
 
-            Argon2::default()
-                .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-                .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })
+                Argon2::default()
+                    .verify_password(password_candidate.as_bytes(), &expected_password_hash)
+                    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })
+            })
         })
         .await
         .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
     }
 }
 
-async fn compute_password_hash(
-    password: &str,
-) -> Result<String, Box<dyn Error + Send + Sync>> {
+#[tracing::instrument(name = "Computing password hash", skip_all)]
+async fn compute_password_hash(password: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
+    let current_span: tracing::Span = tracing::Span::current();
     let password = password.to_owned();
 
     tokio::task::spawn_blocking(move || {
-        let salt: SaltString = SaltString::generate(&mut OsRng);
-        let password_hash = Argon2::new(
-            Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(15000, 2, 1, None)?,
-        )
-        .hash_password(password.as_bytes(), &salt)?
-        .to_string();
+        current_span.in_scope(|| {
+            let salt: SaltString = SaltString::generate(&mut OsRng);
+            let password_hash = Argon2::new(
+                Algorithm::Argon2id,
+                Version::V0x13,
+                Params::new(15000, 2, 1, None)?,
+            )
+            .hash_password(password.as_bytes(), &salt)?
+            .to_string();
 
-        Ok::<String, Box<dyn Error + Send + Sync>>(password_hash)
+            Ok::<String, Box<dyn Error + Send + Sync>>(password_hash)
+        })
     })
     .await
     .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
@@ -135,7 +139,9 @@ mod tests {
 
     #[tokio::test]
     async fn valid_passwords_are_parsed_successfully() {
-        assert!(HashedPassword::parse("password123".to_owned()).await.is_ok());
+        assert!(HashedPassword::parse("password123".to_owned())
+            .await
+            .is_ok());
         assert!(HashedPassword::parse("another_good_password".to_owned())
             .await
             .is_ok());

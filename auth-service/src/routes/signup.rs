@@ -6,6 +6,7 @@ use crate::{
     domain::{AuthAPIError, Email, HashedPassword, User, UserStore, UserStoreError},
 };
 
+#[tracing::instrument(name = "Signup", skip_all, err(Debug))]
 pub async fn signup<T: UserStore>(
     State(state): State<AppState<T>>,
     Json(request): Json<SignupRequest>,
@@ -24,13 +25,13 @@ pub async fn signup<T: UserStore>(
         Ok(_) => return Err(AuthAPIError::UserAlreadyExists),
         Err(UserStoreError::UserNotFound) => (),
         Err(e) => {
-            eprintln!("Unexpected error when checking if user exists: {:?}", e);
+            tracing::error!("Unexpected error when checking if user exists: {:?}", e);
             return Err(AuthAPIError::UnexpectedError);
         }
     }
 
     if let Err(e) = user_store.add_user(user).await {
-        eprintln!("Unexpected error when adding user: {:?}", e);
+        tracing::error!("Unexpected error when adding user: {:?}", e);
         return Err(AuthAPIError::UnexpectedError);
     }
 

@@ -23,7 +23,7 @@ pub async fn login<T: UserStore>(
     let email: Email = match Email::parse(request.email) {
         Ok(email) => email,
         Err(e) => {
-            eprintln!("Invalid email format: {:?}", e);
+            tracing::warn!("Invalid email format: {:?}", e);
             return (
                 jar,
                 Ok((
@@ -52,7 +52,7 @@ pub async fn login<T: UserStore>(
 
     let user_store = state.user_store.read().await;
     if let Err(error) = user_store.validate_user(&email, &raw_password).await {
-        eprintln!("Login failed: {:?}", error);
+        tracing::warn!("Login failed: {:?}", error);
         return (
             jar,
             Ok((
@@ -69,8 +69,6 @@ pub async fn login<T: UserStore>(
         Ok(user) => user,
         Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
     };
-
-    dbg!(&user);
 
     // Handle request based on user's 2FA configuration
     match user.requires_2fa {
@@ -141,7 +139,7 @@ async fn handle_no_2fa(
     let auth_cookie = match crate::utils::auth::generate_auth_cookie(&email) {
         Ok(cookie) => cookie,
         Err(_) => {
-            eprintln!("Failed to generate auth cookie");
+            tracing::error!("Failed to generate auth cookie");
             return (jar, Err(AuthAPIError::UnexpectedError));
         }
     };
